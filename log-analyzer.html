@@ -1,0 +1,655 @@
+<!doctype html>
+<html lang="zh-Hans">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>日志风险分析工具</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --accent: #2563eb;
+      --danger: #b91c1c;
+      --card: rgba(255, 255, 255, 0.08);
+      --border: rgba(255, 255, 255, 0.15);
+      --text: #e5e7eb;
+      --bg: #0f172a;
+      --shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+    }
+
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: radial-gradient(circle at 20% 20%, rgba(37, 99, 235, 0.15), transparent 35%),
+                  radial-gradient(circle at 80% 0%, rgba(16, 185, 129, 0.12), transparent 30%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      padding: 32px 24px 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 26px;
+      letter-spacing: 0.02em;
+    }
+
+    .subtitle {
+      margin: 0;
+      color: #94a3b8;
+      font-size: 14px;
+    }
+
+    .container {
+      padding: 0 24px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .card {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px 18px;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+    }
+
+    .card h2 {
+      margin-top: 0;
+      margin-bottom: 12px;
+      font-size: 18px;
+    }
+
+    .card p {
+      margin: 6px 0 0;
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .dropzone {
+      border: 1px dashed var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      text-align: center;
+      transition: border-color 0.2s ease, background 0.2s ease;
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .dropzone.dragover {
+      border-color: var(--accent);
+      background: rgba(37, 99, 235, 0.08);
+    }
+
+    .button-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    button, label.file-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.6), rgba(37, 99, 235, 0.45));
+      color: white;
+      border-radius: 10px;
+      padding: 10px 14px;
+      cursor: pointer;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      box-shadow: var(--shadow);
+      transition: transform 0.12s ease, filter 0.12s ease;
+      text-decoration: none;
+    }
+
+    button.secondary {
+      background: rgba(255, 255, 255, 0.04);
+      color: #e2e8f0;
+    }
+
+    button:hover, label.file-label:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    button:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      color: #e2e8f0;
+      font-size: 14px;
+    }
+
+    th, td {
+      padding: 10px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: #94a3b8;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      font-size: 12px;
+    }
+
+    tr:hover td {
+      background: rgba(255, 255, 255, 0.02);
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      display: inline-block;
+    }
+
+    .badge.high {
+      background: rgba(185, 28, 28, 0.16);
+      color: #fca5a5;
+    }
+
+    .badge.medium {
+      background: rgba(251, 191, 36, 0.16);
+      color: #facc15;
+    }
+
+    .badge.low {
+      background: rgba(34, 197, 94, 0.16);
+      color: #86efac;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      font-size: 12px;
+      margin: 4px 6px 4px 0;
+    }
+
+    .muted { color: #94a3b8; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 12px;
+    }
+
+    .stat {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+    }
+
+    .stat .label { color: #94a3b8; font-size: 12px; }
+    .stat .value { font-size: 24px; font-weight: 800; margin-top: 2px; }
+
+    .log-preview {
+      max-height: 180px;
+      overflow: auto;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px;
+      white-space: pre;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #cbd5e1;
+    }
+
+    .flex-between {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    @media (max-width: 960px) {
+      .container { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>日志风险分析工具</h1>
+    <p class="subtitle">上传多个日志文件，删除不需要的文件，选择要分析的文件，快速发现高风险 IP 与请求</p>
+  </div>
+  <div class="button-row">
+    <label class="file-label" for="fileInput">📁 选择日志文件</label>
+    <input id="fileInput" type="file" multiple hidden accept=".log,.txt" />
+    <button id="analyzeBtn" type="button">⚡ 开始分析选中文件</button>
+  </div>
+</header>
+
+<div class="container">
+  <section class="card">
+    <div class="flex-between">
+      <h2>文件列表</h2>
+      <span class="badge low" id="fileCount">0 个已上传</span>
+    </div>
+    <div id="dropzone" class="dropzone">拖拽日志文件到此处，或使用上方按钮选择</div>
+    <div class="button-row" style="margin-top:12px;">
+      <button class="secondary" id="clearAllBtn" type="button">🗑️ 清除所有文件</button>
+    </div>
+    <div style="overflow:auto; margin-top:10px;">
+      <table>
+        <thead>
+        <tr>
+          <th style="width: 38px;">分析</th>
+          <th>文件名</th>
+          <th style="width: 120px;">大小</th>
+          <th style="width: 140px;">修改时间</th>
+          <th style="width: 80px;">操作</th>
+        </tr>
+        </thead>
+        <tbody id="fileTableBody">
+        <tr id="emptyRow"><td colspan="5" class="muted">暂无文件，点击“选择日志文件”或拖拽上传</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="flex-between">
+      <h2>分析概览</h2>
+      <div class="grid" style="max-width: 560px; width: 100%;">
+        <div class="stat">
+          <div class="label">已上传</div>
+          <div class="value" id="statUploaded">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">已分析文件</div>
+          <div class="value" id="statAnalyzed">0</div>
+        </div>
+        <div class="stat">
+          <div class="label">高风险 IP</div>
+          <div class="value" id="statHighRisk">0</div>
+        </div>
+      </div>
+    </div>
+    <div id="analysisSummary" class="muted" style="margin-top:10px;">尚未开始分析。</div>
+  </section>
+
+  <section class="card" style="grid-column: 1 / -1;">
+    <div class="flex-between">
+      <h2>高风险 IP</h2>
+      <span class="badge high" id="highRiskCount">0</span>
+    </div>
+    <div style="overflow:auto;">
+      <table>
+        <thead>
+        <tr>
+          <th>IP</th>
+          <th>风险评分</th>
+          <th>请求次数</th>
+          <th>命中规则</th>
+          <th>示例请求</th>
+        </tr>
+        </thead>
+        <tbody id="riskTableBody">
+        <tr id="riskEmpty"><td colspan="5" class="muted">分析后将显示高风险 IP。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="card" style="grid-column: 1 / -1;">
+    <div class="flex-between">
+      <h2>请求明细（已选文件）</h2>
+      <span class="badge medium" id="requestCount">0 条</span>
+    </div>
+    <div style="overflow:auto; max-height: 320px;">
+      <table>
+        <thead>
+        <tr>
+          <th>时间</th>
+          <th>IP</th>
+          <th>方法</th>
+          <th>路径</th>
+          <th>状态</th>
+          <th>UA</th>
+          <th>来源</th>
+        </tr>
+        </thead>
+        <tbody id="requestTableBody">
+        <tr id="requestEmpty"><td colspan="7" class="muted">暂无数据。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+
+<script>
+  const fileInput = document.getElementById('fileInput');
+  const dropzone = document.getElementById('dropzone');
+  const fileTableBody = document.getElementById('fileTableBody');
+  const requestTableBody = document.getElementById('requestTableBody');
+  const riskTableBody = document.getElementById('riskTableBody');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const clearAllBtn = document.getElementById('clearAllBtn');
+  const statUploaded = document.getElementById('statUploaded');
+  const statAnalyzed = document.getElementById('statAnalyzed');
+  const statHighRisk = document.getElementById('statHighRisk');
+  const analysisSummary = document.getElementById('analysisSummary');
+  const requestCount = document.getElementById('requestCount');
+  const highRiskCount = document.getElementById('highRiskCount');
+  const fileCount = document.getElementById('fileCount');
+
+  let uploadedFiles = [];
+  let analyzedFileNames = [];
+
+  const suspiciousPathKeywords = ['wp-admin', 'wp-login', 'phpmyadmin', '.git', 'shell', 'admin', 'login', 'search', 'config'];
+  const suspiciousQueryKeywords = ['union', 'select', 'sleep', '../', ' or ', ' and ', '<script', '%3cscript', 'wget', 'curl'];
+  const suspiciousUserAgentKeywords = ['bot', 'crawler', 'spider', 'scraper', 'curl', 'python', 'sqlmap', 'nmap'];
+
+  function formatBytes(bytes) {
+    if (!bytes) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${units[i]}`;
+  }
+
+  function updateFileTable() {
+    fileTableBody.innerHTML = '';
+    if (!uploadedFiles.length) {
+      const row = document.createElement('tr');
+      row.innerHTML = `<td colspan="5" class="muted">暂无文件，点击“选择日志文件”或拖拽上传</td>`;
+      row.id = 'emptyRow';
+      fileTableBody.appendChild(row);
+    }
+
+    uploadedFiles.forEach(file => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td><input type="checkbox" ${file.selected ? 'checked' : ''} data-id="${file.id}" class="file-select" aria-label="选择文件 ${file.name}" /></td>
+        <td>${file.name}</td>
+        <td>${formatBytes(file.size)}</td>
+        <td>${file.lastModified ? new Date(file.lastModified).toLocaleString() : '-'}</td>
+        <td><button class="secondary" data-id="${file.id}" aria-label="删除 ${file.name}">删除</button></td>
+      `;
+      fileTableBody.appendChild(row);
+    });
+
+    fileCount.textContent = `${uploadedFiles.length} 个已上传`;
+    statUploaded.textContent = uploadedFiles.length;
+  }
+
+  function handleFiles(files) {
+    const newFiles = Array.from(files).map(file => ({
+      id: crypto.randomUUID(),
+      file,
+      name: file.name,
+      size: file.size,
+      lastModified: file.lastModified,
+      content: '',
+      selected: true
+    }));
+
+    newFiles.forEach(f => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        f.content = reader.result;
+      };
+      reader.readAsText(f.file);
+    });
+
+    uploadedFiles = [...uploadedFiles, ...newFiles];
+    updateFileTable();
+  }
+
+  function parseLogLine(line) {
+    const regex = /^(\S+)\s+-\s+(\S+)\s+-\s+(\S+)\s+\[([^\]]+)\]\s+"(\S+)\s+([^\"]+)\s+(HTTP\/[^\"]+)"\s+(\d{3})\s+(\S+)\s+"([^\"]*)"\s+"([^\"]*)"(?:\s+(.*))?$/;
+    const match = line.match(regex);
+    if (match) {
+      return {
+        ip: match[1],
+        port: match[2],
+        host: match[3],
+        time: match[4],
+        method: match[5],
+        path: match[6],
+        protocol: match[7],
+        status: Number(match[8]),
+        size: match[9],
+        referer: match[10],
+        ua: match[11],
+        extra: match[12] || ''
+      };
+    }
+
+    // fallback parsing
+    const parts = line.split(' ');
+    return {
+      ip: parts[0] || 'unknown',
+      port: parts[2] || '',
+      host: parts[4] || '',
+      time: (parts[5] || '').replace('[', ''),
+      method: parts[6] || '',
+      path: parts[7] || '',
+      protocol: parts[8] || '',
+      status: Number(parts[9]) || 0,
+      size: parts[10] || '',
+      referer: '-',
+      ua: '-'
+    };
+  }
+
+  function scoreRequest(request) {
+    let score = 0;
+    const reasons = [];
+    const lowerPath = request.path.toLowerCase();
+    const lowerUa = request.ua.toLowerCase();
+    const lowerQuery = lowerPath;
+
+    suspiciousUserAgentKeywords.forEach(keyword => {
+      if (lowerUa.includes(keyword)) {
+        score += 2;
+        reasons.push(`可疑 UA：${keyword}`);
+      }
+    });
+
+    suspiciousPathKeywords.forEach(keyword => {
+      if (lowerPath.includes(keyword)) {
+        score += 1;
+        reasons.push(`敏感路径：${keyword}`);
+      }
+    });
+
+    suspiciousQueryKeywords.forEach(keyword => {
+      if (lowerQuery.includes(keyword)) {
+        score += 3;
+        reasons.push(`可疑查询：${keyword}`);
+      }
+    });
+
+    if (request.status >= 500) {
+      score += 3; reasons.push('服务器错误 5xx');
+    } else if (request.status >= 400) {
+      score += 2; reasons.push('客户端错误 4xx');
+    }
+
+    if (request.method && request.method.toUpperCase() !== 'GET') {
+      score += 1; reasons.push(`非常规方法 ${request.method}`);
+    }
+
+    return { score, reasons };
+  }
+
+  function analyze() {
+    const selectedFiles = uploadedFiles.filter(f => f.selected && f.content);
+    analyzedFileNames = selectedFiles.map(f => f.name);
+    if (!selectedFiles.length) {
+      analysisSummary.textContent = '请选择至少一个文件进行分析。';
+      return;
+    }
+
+    const requests = [];
+    const ipStats = {};
+
+    selectedFiles.forEach(file => {
+      const lines = file.content.split(/\r?\n/).filter(Boolean);
+      lines.forEach(line => {
+        const req = parseLogLine(line);
+        const { score, reasons } = scoreRequest(req);
+        req.score = score;
+        req.reasons = reasons;
+        req.file = file.name;
+        requests.push(req);
+
+        if (!ipStats[req.ip]) {
+          ipStats[req.ip] = { count: 0, score: 0, reasons: new Set(), sample: req };
+        }
+        ipStats[req.ip].count += 1;
+        ipStats[req.ip].score += score;
+        reasons.forEach(r => ipStats[req.ip].reasons.add(r));
+      });
+    });
+
+    // post adjustments based on volume
+    Object.values(ipStats).forEach(stat => {
+      if (stat.count >= 20) { stat.score += 2; stat.reasons.add('访问频率高于 20 次'); }
+      else if (stat.count >= 10) { stat.score += 1; stat.reasons.add('访问频率高于 10 次'); }
+    });
+
+    const highRisk = Object.entries(ipStats)
+      .map(([ip, data]) => ({ ip, ...data }))
+      .filter(item => item.score >= 4)
+      .sort((a, b) => b.score - a.score);
+
+    renderRequests(requests);
+    renderRisks(highRisk);
+
+    statAnalyzed.textContent = analyzedFileNames.length;
+    statHighRisk.textContent = highRisk.length;
+    analysisSummary.textContent = `已分析 ${selectedFiles.length} 个文件，共 ${requests.length} 条请求；发现 ${highRisk.length} 个高风险 IP。`;
+  }
+
+  function renderRequests(requests) {
+    requestTableBody.innerHTML = '';
+    if (!requests.length) {
+      const row = document.createElement('tr');
+      row.innerHTML = '<td colspan="7" class="muted">暂无数据。</td>';
+      row.id = 'requestEmpty';
+      requestTableBody.appendChild(row);
+      requestCount.textContent = '0 条';
+      return;
+    }
+
+    requests.slice(0, 500).forEach(req => {
+      const row = document.createElement('tr');
+      row.innerHTML = `
+        <td>${req.time || '-'}</td>
+        <td>${req.ip}</td>
+        <td>${req.method}</td>
+        <td>${req.path}</td>
+        <td>${req.status}</td>
+        <td>${req.ua}</td>
+        <td>${req.referer}</td>
+      `;
+      requestTableBody.appendChild(row);
+    });
+
+    requestCount.textContent = `${requests.length} 条`;
+  }
+
+  function renderRisks(highRisk) {
+    riskTableBody.innerHTML = '';
+    if (!highRisk.length) {
+      const row = document.createElement('tr');
+      row.innerHTML = '<td colspan="5" class="muted">未发现高风险 IP。</td>';
+      row.id = 'riskEmpty';
+      riskTableBody.appendChild(row);
+      highRiskCount.textContent = '0';
+      return;
+    }
+
+    highRisk.forEach(item => {
+      const row = document.createElement('tr');
+      const badgeClass = item.score >= 10 ? 'high' : item.score >= 6 ? 'medium' : 'low';
+      row.innerHTML = `
+        <td>${item.ip}</td>
+        <td><span class="badge ${badgeClass}">${item.score}</span></td>
+        <td>${item.count}</td>
+        <td>${Array.from(item.reasons).map(r => `<span class="pill">${r}</span>`).join('')}</td>
+        <td><div class="log-preview">${item.sample.method} ${item.sample.path}\nUA: ${item.sample.ua || '-'}\n来源: ${item.sample.referer || '-'}</div></td>
+      `;
+      riskTableBody.appendChild(row);
+    });
+
+    highRiskCount.textContent = highRisk.length;
+  }
+
+  // Event bindings
+  fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+  dropzone.addEventListener('dragover', e => {
+    e.preventDefault();
+    dropzone.classList.add('dragover');
+  });
+
+  dropzone.addEventListener('dragleave', () => dropzone.classList.remove('dragover'));
+  dropzone.addEventListener('drop', e => {
+    e.preventDefault();
+    dropzone.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+      handleFiles(e.dataTransfer.files);
+    }
+  });
+
+  fileTableBody.addEventListener('change', e => {
+    if (e.target.classList.contains('file-select')) {
+      const id = e.target.dataset.id;
+      uploadedFiles = uploadedFiles.map(f => f.id === id ? { ...f, selected: e.target.checked } : f);
+    }
+  });
+
+  fileTableBody.addEventListener('click', e => {
+    if (e.target.tagName === 'BUTTON') {
+      const id = e.target.dataset.id;
+      uploadedFiles = uploadedFiles.filter(f => f.id !== id);
+      updateFileTable();
+    }
+  });
+
+  analyzeBtn.addEventListener('click', analyze);
+
+  clearAllBtn.addEventListener('click', () => {
+    uploadedFiles = [];
+    analyzedFileNames = [];
+    updateFileTable();
+    renderRequests([]);
+    renderRisks([]);
+    statAnalyzed.textContent = '0';
+    statHighRisk.textContent = '0';
+    analysisSummary.textContent = '已清空文件，请重新上传。';
+  });
+
+  updateFileTable();
+</script>
+</body>
+</html>
